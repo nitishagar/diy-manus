@@ -1,25 +1,26 @@
-.PHONY: install test lint format check clean help
+PY := $(shell if [ -x .venv/bin/python3 ]; then echo .venv/bin/python3; else echo python3; fi)
+
+.PHONY: help install test lint format check clean run smoke setup
 
 help:  ## Show this help message
-	@echo "Mini-Manus Development Commands:"
+	@echo "DIY Manus — local-first agent. Dev commands:"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-install:  ## Install dependencies
-	pip install -r requirements.txt
-	pip install -r requirements-dev.txt
+install:  ## Install dependencies into the venv
+	$(PY) -m pip install -r requirements-dev.txt
 
-test:  ## Run unit tests
-	pytest tests/ -v --cov=. --cov-report=term-missing
+test:  ## Run unit tests (offline, no ollama needed)
+	$(PY) -m pytest tests/ -v --cov=manus --cov-report=term-missing
 
 lint:  ## Run linting checks
 	@echo "Running flake8..."
-	flake8 mini_manus.py tests/
+	$(PY) -m flake8 manus/ tests/
 	@echo "Running mypy..."
-	mypy mini_manus.py --ignore-missing-imports
+	$(PY) -m mypy manus/
 
 format:  ## Format code with black
-	black mini_manus.py tests/
+	$(PY) -m black manus/ tests/
 
 check: lint test  ## Run all checks (lint + test)
 
@@ -30,10 +31,11 @@ clean:  ## Clean up cache files
 	find . -type f -name "*.pyc" -delete
 	rm -rf .coverage htmlcov/
 
-dev-setup: install  ## Setup development environment
-	@echo "✅ Development environment ready!"
-	@echo ""
-	@echo "Next steps:"
-	@echo "  1. cp .env.example .env"
-	@echo "  2. Add your API keys to .env"
-	@echo "  3. Run 'make check' to verify setup"
+run:  ## Run a task locally: make run TASK="create hello.txt containing hi"
+	$(PY) -m manus "$(TASK)"
+
+smoke:  ## End-to-end local smoke test (needs local ollama)
+	bash scripts/smoke.sh
+
+setup:  ## One-command local setup (venv, deps, ollama check)
+	bash scripts/setup.sh

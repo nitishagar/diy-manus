@@ -1,6 +1,4 @@
-langgraph==0.2.28
-langchain==0.3.1
-langchain-openai==0.2.1
-mem0ai==0.1.6
-python-dotenv==1.0.1
-tavily-python==0.5.0
+openai>=1.40
+ddgs>=9.0
+trafilatura>=1.8
+python-dotenv>=1.0
