@@ -83,8 +83,8 @@ Hard core: safe local tool execution.
 #### `manus/tools/browser.py`
 `browser_navigate(url)`, `browser_click(index)`, `browser_snapshot()` — lazy `import playwright` inside `run()`; any failure (module missing, chromium binary missing, navigation error) → structured observation "browser tool unavailable: …" with install hint. Tools always registered.
 ### Success Criteria
-- [ ] Local: `pytest tests/test_tools.py -q` → all pass; covers: traversal refusal (`../../etc/passwd`, absolute outside, **symlink escape**), parent-dir creation, shell cap (generate >cap bytes → observation capped + no full buffer), shell timeout with backgrounded child reaped (`pgrep` assertion), empty output, unicode long-line truncation marker, search/fetch failure observations including mocked timeout/hang, browser unavailable observation (mocked import + call-time failure), searxng backend switch (mocked HTTP). A miss localizes to: the named tool module.
-- [ ] End-to-end: `make lint && make test` → clean + green.
+- [x] Local: `pytest tests/test_tools.py -q` → all pass; covers: traversal refusal (`../../etc/passwd`, absolute outside, **symlink escape**), parent-dir creation, shell cap (generate >cap bytes → observation capped + no full buffer), shell timeout with backgrounded child reaped (`pgrep` assertion), empty output, unicode long-line truncation marker, search/fetch failure observations including mocked timeout/hang, browser unavailable observation (mocked import + call-time failure), searxng backend switch (mocked HTTP). A miss localizes to: the named tool module. ✓ `21 passed`
+- [x] End-to-end: `make lint && make test` → clean + green. ✓ `FLAKE8_CLEAN` · `Success: no issues found in 13 source files` · `43 passed in 4.73s`
 - [ ] Manual: none.
 
 ## Phase 3 (Stage C): Sessions, recall, CLI — all-local wiring
