@@ -49,7 +49,7 @@ def test_crash_readable_per_event_commit(tmp_path: Path):
     assert events[0][4] == "file1\nfile2"
 
 
-def test_unwritable_db_degrades_without_raising(tmp_path: Path):
+def test_unwritable_db_degrades_without_raising(tmp_path: Path, capsys):
     blocker = tmp_path / "not-a-dir"
     blocker.write_text("i am a file")  # parent dir exists but child path is a file
     store = SessionStore(blocker / "child.db")  # mkdir(parent) will fail
@@ -58,6 +58,10 @@ def test_unwritable_db_degrades_without_raising(tmp_path: Path):
     assert store.search_text("q") == "No history available."
     assert store.list_runs() == []
     assert store.get_run(1) is None
+    # degradation must be reported, not silent (spec invariant 9: trace loss is reported)
+    captured = capsys.readouterr()
+    assert "warning" in captured.err
+    assert "session store unavailable" in captured.err
 
 
 def test_missing_parent_dir_created(tmp_path: Path):

@@ -139,6 +139,26 @@ def test_unreachable_endpoint_is_actionable_llm_error(monkeypatch):
         client.chat([{"role": "user", "content": "hi"}], [])
 
 
+def test_env_base_url_override_flows_to_client(monkeypatch):
+    """The single config seam must reach the SDK client: a hosted endpoint is used
+    only by setting MANUS_BASE_URL (spec invariant 8)."""
+    captured = {}
+
+    def create(**kwargs):
+        return fake_response(content="ok")
+
+    class FakeOpenAI:
+        def __init__(self, base_url=None, api_key=None):
+            captured["base_url"] = base_url
+            captured["api_key"] = api_key
+            self.chat = SimpleNamespace(completions=SimpleNamespace(create=staticmethod(create)))
+
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+    monkeypatch.setenv("MANUS_BASE_URL", "http://192.0.2.9:9999/v1")  # TEST-NET-1, never dialed
+    LLMClient(Config.from_env()).chat([{"role": "user", "content": "hi"}], [])
+    assert captured["base_url"] == "http://192.0.2.9:9999/v1"
+
+
 def test_prose_json_fallback_recovers_tool_call():
     prose = (
         'I will write the file now. {"name": "file_write", '
@@ -157,20 +177,40 @@ def test_prose_fallback_ignores_json_without_name():
 
 
 def test_import_hygiene_no_side_effects_on_empty_env():
-    """Importing every manus module in a clean interpreter must not construct clients
-    or require any env (spec invariant 2)."""
+    """Importing every manus module in a clean interpreter must not construct clients,
+    touch the network, write files, or require any env (spec invariant 2)."""
     code = (
-        "import importlib, sys\n"
+        "import os, sys\n"
+        "violations = []\n"
+        "FORBIDDEN = ('socket.connect', 'socket.getaddrinfo', 'socket.bind',\n"
+        "             'socket.sendto', 'urllib.Request', 'subprocess.Popen',\n"
+        "             'os.mkdir', 'os.remove', 'os.rename', 'os.rmdir',\n"
+        "             'os.symlink', 'os.link', 'os.chmod', 'os.truncate')\n"
+        "def _audit(event, args):\n"
+        "    if event in FORBIDDEN:\n"
+        "        violations.append((event, str(args)[:120]))\n"
+        "    elif event == 'open':\n"
+        "        mode, flags = args[1] or '', args[2] or 0\n"
+        "        if ('w' in mode or 'a' in mode or 'x' in mode or\n"
+        "                flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT |\n"
+        "                         os.O_TRUNC | os.O_APPEND)):\n"
+        "            violations.append((event, str(args)[:120]))\n"
+        "sys.addaudithook(_audit)\n"
+        "import importlib\n"
         "mods = ['manus', 'manus.config', 'manus.util', 'manus.llm', 'manus.agent', "
-        "'manus.tools', 'manus.tools.base', 'manus.tools.builtin']\n"
+        "'manus.session', 'manus.trace', 'manus.__main__', "
+        "'manus.tools', 'manus.tools.base', 'manus.tools.builtin', 'manus.tools.files', "
+        "'manus.tools.shell', 'manus.tools.search', 'manus.tools.fetch', 'manus.tools.browser']\n"
         "for m in mods:\n"
         "    importlib.import_module(m)\n"
-        "import openai\n"
-        "assert openai.OpenAI is not None\n"
+        # optional deps must stay lazy: importing the package may not pull them in
+        "for lazy in ('ddgs', 'trafilatura', 'playwright', 'playwright.sync_api'):\n"
+        "    assert lazy not in sys.modules, f'{lazy} imported at module load'\n"
+        "assert not violations, f'import side effects: {violations}'\n"
         "print('HYGIENE OK')\n"
     )
     result = subprocess.run(
-        [sys.executable, "-c", code],
+        [sys.executable, "-B", "-c", code],
         env={"PATH": "/usr/bin:/bin", "HOME": "/nonexistent"},
         capture_output=True,
         text=True,

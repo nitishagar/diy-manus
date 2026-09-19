@@ -49,6 +49,18 @@ def test_env_model_override(monkeypatch):
     assert Config.from_env().model == "llama3:8b"
 
 
+def test_config_defaults_are_local(monkeypatch):
+    """With zero env config, defaults must describe a fully local setup — no cloud
+    endpoint, no API key requirement (spec invariants 1 and 8)."""
+    for var in ("MANUS_BASE_URL", "MANUS_API_KEY", "MANUS_MODEL", "MANUS_WORKSPACE", "MANUS_DB"):
+        monkeypatch.delenv(var, raising=False)
+    cfg = Config.from_env()
+    assert cfg.base_url == "http://127.0.0.1:11434/v1"
+    assert cfg.api_key == "ollama"
+    assert cfg.model == "qwen2.5:3b"
+    assert cfg.workspace == Path("~/manus_workspace").expanduser()
+
+
 def test_run_writes_trace_and_result(cli_env, monkeypatch, capsys):
     db, _workspace = cli_env
 

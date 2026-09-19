@@ -63,7 +63,7 @@ class ShellExecTool(Tool):
                         break
                     chunks.append(chunk)
                 elif proc.poll() is not None:
-                    break  # exited; drain what select still reports below
+                    break  # exited, and the pipe was empty at the last select
         finally:
             if proc.poll() is None:
                 self._kill_group(proc)

@@ -67,7 +67,12 @@ class LLMClient:
         except openai.BadRequestError as exc:
             if "reasoning_effort" in kwargs and "reasoning_effort" in str(exc):
                 kwargs.pop("reasoning_effort")
-                response = client.chat.completions.create(**kwargs)
+                try:
+                    response = client.chat.completions.create(**kwargs)
+                except openai.APIError as retry_exc:
+                    raise LLMError(
+                        "LLM rejected the request even without reasoning_effort: " f"{retry_exc}"
+                    ) from retry_exc
             else:
                 raise LLMError(f"LLM rejected the request: {exc}") from exc
         except openai.APIConnectionError as exc:
@@ -81,6 +86,8 @@ class LLMClient:
                 "Set MANUS_API_KEY if your endpoint requires one."
             ) from exc
 
+        if not response.choices:
+            raise LLMError("LLM returned an empty response (no choices).")
         choice = response.choices[0]
         message = choice.message
         tool_call: Optional[ToolCall] = None

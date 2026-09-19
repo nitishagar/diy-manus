@@ -17,7 +17,8 @@ def truncate_bytes(text: str, cap: int) -> str:
     """
     if cap <= 0 or len(text.encode("utf-8")) <= cap:
         return text
-    cut = cap - len(TRUNCATION_MARKER.encode("utf-8"))
+    marker_len = len(TRUNCATION_MARKER.encode("utf-8"))
+    cut = max(0, cap - marker_len)  # a cap smaller than the marker must not cut negatively
     encoded = text.encode("utf-8")[:cut].decode("utf-8", errors="ignore")
     return encoded + TRUNCATION_MARKER
 

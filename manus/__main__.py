@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--workspace", help="Directory the agent works in (default ~/manus_workspace)."
     )
     parser.add_argument("--max-steps", type=int, help="Agent step limit (default 30).")
-    parser.add_argument("--model", help="Model name for the LLM endpoint (default qwen3:4b).")
+    parser.add_argument("--model", help="Model name for the LLM endpoint (default qwen2.5:3b).")
     parser.add_argument("--base-url", help="OpenAI-compatible LLM endpoint (default local ollama).")
     parser.add_argument(
         "--db", help="Session store path (default ~/.local/share/diy-manus/sessions.db)."
@@ -123,10 +123,16 @@ def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    try:
+        cfg = _apply_overrides(Config.from_env(), args)
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
     if args.list:
-        return _print_list(SessionStore(Config.from_env().db_path))
+        return _print_list(SessionStore(cfg.db_path))
     if args.replay is not None:
-        return _print_replay(SessionStore(Config.from_env().db_path), args.replay)
+        return _print_replay(SessionStore(cfg.db_path), args.replay)
 
     task = " ".join(args.task).strip()
     if not task:
@@ -135,12 +141,6 @@ def main(argv=None) -> int:
             'error: a task is required, e.g. manus "create hello.txt containing hi"',
             file=sys.stderr,
         )
-        return 1
-
-    try:
-        cfg = _apply_overrides(Config.from_env(), args)
-    except ConfigError as exc:
-        print(f"error: {exc}", file=sys.stderr)
         return 1
 
     return _run_task(cfg, task)

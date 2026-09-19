@@ -23,7 +23,7 @@ echo "· running task in $SMOKE_DIR (this can take a few minutes on CPU)..."
   >"$SMOKE_DIR/stdout.log" 2>"$SMOKE_DIR/stderr.log"
 STATUS=$?
 
-if [ "$STATUS" -eq 0 ] && [ -f "$SMOKE_DIR/hello.txt" ] && grep -qi "hi" "$SMOKE_DIR/hello.txt"; then
+if [ "$STATUS" -eq 0 ] && [ -f "$SMOKE_DIR/hello.txt" ] && grep -qix "hi" "$SMOKE_DIR/hello.txt"; then
   echo "SMOKE PASS: task finished and hello.txt created"
   exit 0
 fi

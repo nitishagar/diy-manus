@@ -137,6 +137,7 @@ class SessionStore:
         conn = self._connect()
         if conn is None:
             return "No history available."
+        rows: List[Tuple] = []  # stays empty when every query form fails (e.g. corrupt index)
         for match_query in (query, f'"{query.replace(chr(34), chr(39) * 2)}"'):
             try:
                 rows = conn.execute(

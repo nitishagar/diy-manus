@@ -126,8 +126,9 @@ class Agent:
             args = _parse_arguments(call.arguments)
             if args is None:
                 malformed += 1
-                messages.append(self._assistant_tool_message(call, response.content))
-                messages.append(self._tool_message(call, step, BAD_JSON_ADVICE))
+                cid = call.id or f"call_{step}"
+                messages.append(self._assistant_tool_message(call, response.content, cid))
+                messages.append(self._tool_message(cid, BAD_JSON_ADVICE))
                 if malformed >= MALFORMED_STRIKES:
                     return self._end(
                         "aborted_malformed",
@@ -150,11 +151,12 @@ class Agent:
             tool = self._registry.get(call.name)
             if tool is None:
                 malformed += 1
+                cid = call.id or f"call_{step}"
                 known = ", ".join(t.name for t in self._registry.tools)
-                messages.append(self._assistant_tool_message(call, response.content))
+                messages.append(self._assistant_tool_message(call, response.content, cid))
                 messages.append(
                     self._tool_message(
-                        call, step, f"Error: unknown tool {call.name!r}. Available: {known}."
+                        cid, f"Error: unknown tool {call.name!r}. Available: {known}."
                     )
                 )
                 if malformed >= MALFORMED_STRIKES:
@@ -175,8 +177,9 @@ class Agent:
             observation = truncate_bytes(observation, self._config.observe_cap_bytes)
             if self._on_event is not None:
                 self._on_event("tool", call.name, args, observation, elapsed)
-            messages.append(self._assistant_tool_message(call, response.content))
-            messages.append(self._tool_message(call, step, observation))
+            cid = call.id or f"call_{step}"
+            messages.append(self._assistant_tool_message(call, response.content, cid))
+            messages.append(self._tool_message(cid, observation))
 
         return self._end(
             "max_steps",
@@ -190,19 +193,21 @@ class Agent:
         except Exception as exc:  # tool failures are observations, never loop crashes
             return f"Tool error: {type(exc).__name__}: {exc}"
 
-    def _assistant_tool_message(self, call: ToolCall, content: str) -> dict:
+    def _assistant_tool_message(self, call: ToolCall, content: str, call_id: str) -> dict:
         message: dict = {"role": "assistant", "content": content}
         message["tool_calls"] = [
             {
-                "id": call.id or "call_missing",
+                "id": call_id,
                 "type": "function",
                 "function": {"name": call.name, "arguments": call.arguments},
             }
         ]
         return message
 
-    def _tool_message(self, call: ToolCall, step: int, content: str) -> dict:
-        return {"role": "tool", "tool_call_id": call.id or f"call_{step}", "content": content}
+    def _tool_message(self, call_id: str, content: str) -> dict:
+        # call_id must match the assistant message's tool_calls id, or strict
+        # OpenAI-compatible endpoints reject the whole conversation.
+        return {"role": "tool", "tool_call_id": call_id, "content": content}
 
     def _end(self, status: str, summary: str, steps: int) -> RunResult:
         return RunResult(summary=summary, status=status, steps=steps)

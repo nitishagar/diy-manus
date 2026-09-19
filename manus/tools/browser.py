@@ -27,8 +27,20 @@ def _launch(ctx: ToolContext):
     if _state.get("page") is not None:
         return _state["page"]
     playwright = sync_playwright().start()
-    browser = playwright.chromium.launch(headless=True)
-    page = browser.new_page()
+    browser = None
+    try:
+        browser = playwright.chromium.launch(headless=True)
+        page = browser.new_page()
+    except Exception:
+        # partial launch: release the driver (and browser if it came up) so repeated
+        # failures do not leak a node subprocess per failed call
+        if browser is not None:
+            try:
+                browser.close()
+            except Exception:
+                pass
+        playwright.stop()
+        raise
     _state.update(playwright=playwright, browser=browser, page=page)
     return page
 

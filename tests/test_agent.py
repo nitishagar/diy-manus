@@ -107,6 +107,46 @@ def test_invalid_json_arguments_strike_then_recover(scripted_llm, offline_config
     assert result.status == "finished"
 
 
+def test_three_invalid_json_arguments_abort(scripted_llm, offline_config):
+    scripted_llm.responses = [
+        LLMResponse(
+            content="",
+            tool_call=ToolCall(name="noop", arguments="{not json", id=f"c{i}"),
+            finish_reason="tool_calls",
+        )
+        for i in range(3)
+    ]
+    agent = make_agent(scripted_llm, offline_config, tools=[NoopTool()])
+    result = agent.run("garbled", offline_config.workspace)
+    assert result.status == "aborted_malformed"
+    assert result.steps == 3
+
+
+class ExplodingTool(Tool):
+    name = "explode"
+    description = "always raises"
+    parameters = {"type": "object", "properties": {}, "required": []}
+
+    def run(self, args, ctx):
+        raise RuntimeError("disk on fire")
+
+
+def test_tool_exception_becomes_observation_and_loop_continues(scripted_llm, offline_config):
+    """A crashing tool must never take the loop down (spec: tool failures are
+    observations); the error text stays in the append-only context."""
+    scripted_llm.responses = [
+        tool_response("explode", {}, call_id="c1"),
+        tool_response("finish", {"summary": "survived"}, call_id="c2"),
+    ]
+    agent = make_agent(scripted_llm, offline_config, tools=[ExplodingTool()])
+    result = agent.run("crash test", offline_config.workspace)
+    assert result.status == "finished"
+    assert result.summary == "survived"
+    tool_msgs = [m for m in scripted_llm.calls[-1] if m.get("role") == "tool"]
+    assert "Tool error" in tool_msgs[0]["content"]
+    assert "disk on fire" in tool_msgs[0]["content"]
+
+
 def test_identical_call_guard_aborts(scripted_llm, offline_config):
     scripted_llm.responses = [
         tool_response("noop", {"arg": "same"}, call_id=f"c{i}") for i in range(5)

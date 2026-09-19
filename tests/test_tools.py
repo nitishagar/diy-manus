@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import threading
 import types
 import urllib.request
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import pytest
@@ -194,12 +196,39 @@ def test_web_search_searxng_backend_switch(ctx, monkeypatch):
 
 # ---------- fetch tool ----------
 
+PAGE_HTML = (
+    "<html><head><title>Local Test Page</title></head><body>"
+    "<article><h1>Served locally</h1>"
+    "<p>This paragraph exists so the extractor finds readable main content on the page. "
+    "It has several sentences to look like a real document body for trafilatura.</p>"
+    "<p>A second paragraph with more text about local deterministic testing of fetch tools.</p>"
+    "</article></body></html>"
+)
+
 
 def test_web_fetch_extracts_text(ctx):
-    # example.com is small and stable; net request is real but tiny.
-    # Assert on extraction success rather than exact copy, which the page may edit.
-    result = WebFetchTool().run({"url": "https://example.com"}, ctx)
-    assert not result.startswith("Fetch error")
+    # Served from a localhost HTTP server so the suite stays hermetic: no external
+    # network in unit tests (example.com was here before and broke offline runs).
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = PAGE_HTML.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        result = WebFetchTool().run({"url": f"http://127.0.0.1:{server.server_address[1]}/"}, ctx)
+    finally:
+        server.shutdown()
+    assert not result.startswith("Fetch error"), result
+    assert "Served locally" in result
     assert len(result) > 20
 
 
