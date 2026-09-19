@@ -1,195 +1,127 @@
-# Mini-Manus: Build Your Own Autonomous Research Agent in 30 Minutes
+# DIY Manus — a local-first general AI agent
 
-A simplified version of [Manus](https://manus.im) - demonstrating autonomous AI agents with LangGraph + Mem0.
+A working, self-hosted take on [Manus](https://manus.im): an agent that plans, uses tools
+(shell, files, web), and delivers real files — running **entirely on your machine**. No cloud
+API keys, no subscriptions, no data leaving your network.
 
-**What Manus does**: Autonomously breaks down complex tasks, executes multi-step workflows, learns from experience
+```
+┌──────────── you ────────────┐
+│  manus "research X and      │
+│  write a summary.md"        │
+└──────────────┬──────────────┘
+               ▼
+┌────────── agent loop ───────┐   one tool call per iteration,
+│  think → act → observe      │   append-only context, todo.md
+│  (repeat until finish)      │   recitation, bounded outputs
+└──────────────┬──────────────┘
+               ▼
+┌─────────── tools ───────────┐
+│ shell · file · web_search   │   LLM: ollama (OpenAI-compatible)
+│ web_fetch · browser · recall│   search: keyless DuckDuckGo
+└──────────────┬──────────────┘   memory: SQLite + FTS5
+               ▼
+      deliverables in your workspace + replayable session trace
+```
 
-**What we'll build**: A mini research agent that autonomously:
-1. Plans its own research strategy
-2. Searches the web for information
-3. Synthesizes findings into reports
-4. Learns user preferences across sessions
+## 90-second quickstart
 
-## Quick Start
+Requires [Python 3.10+](https://python.org), [ollama](https://ollama.com), and `make`.
 
 ```bash
-# 1. Install dependencies
-pip install -r requirements.txt
+git clone https://github.com/nitishagar/diy-manus.git
+cd diy-manus
 
-# 2. Configure API keys
-cp .env.example .env
-# Edit .env with your keys
-
-# 3. Run a research query
-python mini_manus.py "What are the latest developments in quantum computing?"
+make setup                                   # venv + deps + ollama check + model pull
+make run TASK="create hello.txt containing hi"
+make smoke                                   # end-to-end local test
 ```
 
-## Architecture
+That's the whole setup. The agent thinks out loud in your terminal (one line per step),
+writes deliverables into `~/manus_workspace`, and stores a replayable trace locally.
 
+> On a CPU-only laptop expect ~30–60 s per agent step; a task is typically 3–15 steps.
+> Have a GPU or want a stronger model? Point `MANUS_BASE_URL`/`MANUS_MODEL` at any
+> OpenAI-compatible endpoint — the code is identical.
+
+## What it inherited from Manus
+
+| Manus behavior | DIY Manus |
+|---|---|
+| Agent loop: pick one action → execute in sandbox → observe → repeat | ✅ same shape; max-steps and guards force termination |
+| `todo.md` planning, re-stated to stay on track ("recitation") | ✅ agent maintains todo.md via file tools |
+| File system as externalized memory | ✅ workspace files + SQLite session history |
+| Fixed tool space, one tool per iteration | ✅ fixed registry of 11 tools |
+| Session replay of every step | ✅ `manus --replay <id>` + live stderr trace |
+| Deliverables: real files, not just chat | ✅ everything lands in your workspace |
+| Cloud VM sandbox + browser + deploy tools | 🚧 local processes now; Docker sandbox on the roadmap |
+
+## Tools
+
+| Tool | What it does |
+|---|---|
+| `shell_exec` | bash in the workspace; merged output, size-capped, killed at timeout (process group) |
+| `file_read` / `file_write` / `file_list` | workspace-confined file ops (traversal and symlink escapes refused) |
+| `web_search` | keyless search via [ddgs](https://pypi.org/project/ddgs/), or your self-hosted SearXNG |
+| `web_fetch` | bounded download + main-content extraction ([trafilatura](https://trafilatura.readthedocs.io)) |
+| `browser_navigate` / `browser_snapshot` / `browser_click` | optional local Playwright Chromium; degrades gracefully if not installed |
+| `recall` | full-text search over past local sessions (SQLite FTS5) |
+| `finish` | end the task with a summary |
+
+Small local models sometimes answer in prose instead of tool JSON; the loop detects that,
+attempts one JSON-recovery pass, and aborts cleanly after repeated failures instead of
+looping forever.
+
+## Configuration
+
+Everything runs local **by default** — zero env vars required. Overrides (via environment
+or `.env`, see [.env.example](.env.example)):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MANUS_BASE_URL` | `http://127.0.0.1:11434/v1` | any OpenAI-compatible endpoint |
+| `MANUS_MODEL` | `qwen2.5:3b` | tool-calling capable model; `qwen3:4b`+ for stronger machines |
+| `MANUS_API_KEY` | `ollama` | only needed for hosted endpoints |
+| `MANUS_WORKSPACE` | `~/manus_workspace` | where the agent works |
+| `MANUS_DB` | `~/.local/share/diy-manus/sessions.db` | session memory |
+| `MANUS_MAX_STEPS` | `30` | hard step limit per run |
+| `MANUS_SEARCH_BACKEND` | `ddgs` | or `searxng` + `MANUS_SEARXNG_URL` |
+
+Past runs and traces:
+
+```bash
+manus --list            # recent runs
+manus --replay 3        # step-by-step replay of run 3
 ```
-┌──────────┐
-│  Planner │ ← Decides next action autonomously
-└────┬─────┘
-     │
-     ├─→ Research Node (web search)
-     │
-     └─→ Writer Node (synthesize report)
-```
 
-### Key Patterns from Manus
+## Safety notes (read this)
 
-1. **Autonomous Decision-Making**: The planner decides what to do next (research vs. write vs. done)
-2. **Multi-Step Execution**: Breaks complex tasks into steps
-3. **Transparent Thinking**: Shows each decision it makes (like Manus replay feature)
-4. **Memory Across Sessions**: Learns user preferences via Mem0
+- The shell tool executes real commands on your machine **inside your workspace
+  directory**. It is a convenience, not a security boundary: a model tricked by malicious
+  web content could ask it to run harmful commands. Don't point the agent at untrusted
+  tasks you wouldn't type yourself; the roadmap adds a Docker sandbox seam.
+- File tools are hard-confined to the workspace (including symlink escapes), and shell
+  output is size-capped and time-limited — but the shell itself is not jailed.
+- Everything stays on your machine unless you set a hosted `MANUS_BASE_URL`.
 
 ## Development
 
 ```bash
-# Install dev dependencies
-make install
-
-# Run linting
-make lint
-
-# Run tests
-make test
-
-# Run all checks
-make check
-
-# Format code
-make format
+make install   # dev deps
+make check     # flake8 + mypy + pytest (62 tests, fully offline — no ollama needed)
+make format    # black
+make lint      # flake8 + mypy
 ```
 
-## Testing
+The test suite drives the agent loop with a scripted FakeLLM, so it never touches a model
+or the network. `make smoke` is the only test that uses ollama.
 
-Comprehensive unit tests cover:
-- Planning/decision logic
-- Research data collection
-- Report synthesis
-- Graph routing
-- Memory integration
-- Full workflow integration
+## Roadmap
 
-```bash
-# Run tests with coverage
-pytest tests/ -v --cov=mini_manus --cov-report=term-missing
-
-# Current coverage: ~85%
-```
-
-## Code Quality
-
-- **Linting**: flake8 + mypy for type checking
-- **Formatting**: black (100 char line length)
-- **Testing**: pytest with mocking for external APIs
-- **Type Hints**: Full type annotations
-
-## API Keys Required
-
-- **OpenAI** (gpt-4o-mini): https://platform.openai.com
-- **Mem0** (memory layer): https://app.mem0.ai
-- **Tavily** (web search): https://tavily.com
-
-All have free tiers to get started.
-
-## How It Works
-
-### 1. Planner Node (The Brain)
-
-```python
-def planner_node(state):
-    # Retrieves user preferences from Mem0
-    # Decides: RESEARCH, WRITE_REPORT, or DONE
-    # Returns decision to router
-```
-
-**Like Manus**: Makes autonomous decisions about next steps
-
-### 2. Research Node (The Gatherer)
-
-```python
-def research_node(state):
-    # Searches web via Tavily
-    # Collects structured findings
-    # Stores in Mem0 for future reference
-```
-
-**Like Manus**: Autonomously gathers information from multiple sources
-
-### 3. Writer Node (The Synthesizer)
-
-```python
-def writer_node(state):
-    # Analyzes research data
-    # Generates comprehensive report
-    # Stores completed work in memory
-```
-
-**Like Manus**: Creates deliverables from raw information
-
-### 4. LangGraph Orchestration
-
-```python
-workflow = StateGraph(ResearchState)
-workflow.add_node("planner", planner_node)
-workflow.add_node("research", research_node)
-workflow.add_node("write", writer_node)
-# Planner routes to research/write/end dynamically
-```
-
-**Like Manus**: Explicit, visual workflow that adapts based on state
-
-## What's Different from Real Manus?
-
-| Feature | Manus | Mini-Manus |
-|---------|-------|------------|
-| Scope | Code, data analysis, content, research | Research only |
-| UI | Web interface with replay | CLI output |
-| Complexity | Multi-hour tasks | ~30 second tasks |
-| Cost | $2/task | ~$0.10/task |
-| Code | Production-grade | Educational (~200 lines) |
-
-**Mini-Manus is for learning the patterns.** The principles scale to production systems.
-
-## Extending Mini-Manus
-
-Ideas to make it more Manus-like:
-
-1. **Add more specialist agents**:
-   ```python
-   workflow.add_node("fact_checker", fact_check_node)
-   workflow.add_node("citation_validator", citation_node)
-   ```
-
-2. **Implement task replay**:
-   ```python
-   # Save each step's state for replay
-   checkpointer.save(step_id, state)
-   ```
-
-3. **Add human-in-the-loop**:
-   ```python
-   workflow.add_node("approval", await_human_approval)
-   ```
-
-4. **Multi-modal support**:
-   ```python
-   workflow.add_node("image_analyzer", process_images)
-   ```
-
-## Learning Resources
-
-- **LangGraph Docs**: https://docs.langchain.com/docs/langgraph
-- **Mem0 Docs**: https://docs.mem0.ai
-- **Manus Guide**: https://github.com/hodorwang/manus-guide
-- **Original Manus**: https://manus.im
+- Docker-sandboxed shell tool (pluggable `Sandbox` seam)
+- Local web UI with Manus-style session replay
+- Scheduled/recurring tasks
+- Multi-agent flows for wide research
 
 ## License
 
-MIT - Educational purposes
-
----
-
-**Built as a tutorial for understanding autonomous AI agent patterns inspired by Manus.**
+MIT

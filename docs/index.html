@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DIY Manus — a local-first general AI agent</title>
+<meta name="description" content="A working, self-hosted take on Manus: plans, uses tools, delivers files. Runs entirely on your machine with ollama. No cloud keys.">
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #7ee787; --accent2: #79c0ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.65 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  header { padding: 72px 0 48px; border-bottom: 1px solid var(--border); }
+  h1 { font-size: 42px; letter-spacing: -0.5px; }
+  h1 .dim { color: var(--muted); font-weight: 400; }
+  .tagline { margin-top: 14px; font-size: 20px; color: var(--muted); max-width: 720px; }
+  .tagline b { color: var(--accent); font-weight: 600; }
+  .badges { margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .badge { font-size: 13px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+  .badge.green { color: var(--accent); border-color: var(--accent); }
+  h2 { font-size: 24px; margin: 48px 0 16px; }
+  p { margin: 12px 0; }
+  a { color: var(--accent2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  pre { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; overflow-x: auto; font-size: 14px; margin: 16px 0; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  p code, li code, td code { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 0.88em; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 20px 0; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; }
+  .card h3 { font-size: 16px; color: var(--accent2); margin-bottom: 6px; }
+  .card p { color: var(--muted); font-size: 14px; margin: 0; }
+  .cta { display: inline-block; background: var(--accent); color: #052e0f; font-weight: 700; padding: 12px 22px; border-radius: 8px; margin-top: 8px; }
+  .cta:hover { text-decoration: none; filter: brightness(1.08); }
+  .note { color: var(--muted); font-size: 14px; }
+  footer { margin: 64px 0 40px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>DIY Manus <span class="dim">/ local-first general agent</span></h1>
+  <p class="tagline">A working, self-hosted take on <a href="https://manus.im">Manus</a>: an agent that plans, uses tools, and delivers real files — running <b>entirely on your machine</b>. No cloud keys. No data leaving your network.</p>
+  <div class="badges">
+    <span class="badge green">100% local by default</span>
+    <span class="badge">ollama · qwen2.5:3b</span>
+    <span class="badge">keyless web search</span>
+    <span class="badge">SQLite session memory</span>
+    <span class="badge">MIT</span>
+  </div>
+</header>
+
+<h2>Quickstart</h2>
+<pre><code>git clone https://github.com/nitishagar/diy-manus.git
+cd diy-manus
+make setup                                  <span style="color:var(--muted)"># venv + deps + ollama + model pull</span>
+make run TASK="create hello.txt containing hi"
+make smoke                                  <span style="color:var(--muted)"># end-to-end local test</span></code></pre>
+<p class="note">Needs Python 3.10+, <a href="https://ollama.com">ollama</a>, and <code>make</code>. On a CPU-only laptop expect ~30–60 s per agent step; tasks are typically 3–15 steps.</p>
+<a class="cta" href="https://github.com/nitishagar/diy-manus">View on GitHub</a>
+
+<h2>How it works</h2>
+<p>The same agent-loop shape Manus describes publicly: each iteration the model picks <b>one</b> tool call, the tool executes locally, and the observation is appended to an append-only context. The agent keeps its plan in <code>todo.md</code>, adapts after errors, and terminates on <code>finish</code>, repeated failures, or the step limit — never loops forever. Every step is traced live and stored for replay.</p>
+<div class="grid">
+  <div class="card"><h3>shell_exec</h3><p>bash in your workspace; output size-capped, killed at timeout, process group reaped.</p></div>
+  <div class="card"><h3>file_read / write / list</h3><p>Hard-confined to the workspace — path traversal and symlink escapes are refused.</p></div>
+  <div class="card"><h3>web_search / web_fetch</h3><p>Keyless DuckDuckGo search (or your own SearXNG) + readable-text extraction. No API keys.</p></div>
+  <div class="card"><h3>browser tools</h3><p>Optional local Playwright Chromium; degrades to a clear "unavailable" note if not installed.</p></div>
+  <div class="card"><h3>recall</h3><p>Full-text search over past local sessions (SQLite FTS5) — memory without the cloud.</p></div>
+  <div class="card"><h3>replay</h3><p><code>manus --list</code> and <code>manus --replay &lt;id&gt;</code> re-show every step of a run.</p></div>
+</div>
+
+<h2>What it inherited from Manus</h2>
+<table>
+  <tr><th>Manus behavior</th><th>DIY Manus</th></tr>
+  <tr><td>One-action agent loop with observations</td><td>✅ same shape, with termination guards</td></tr>
+  <tr><td><code>todo.md</code> planning + recitation</td><td>✅ maintained via file tools</td></tr>
+  <tr><td>File system as externalized memory</td><td>✅ workspace + SQLite history</td></tr>
+  <tr><td>Session replay</td><td>✅ live trace + <code>--replay</code></td></tr>
+  <tr><td>Deliverables, not just chat</td><td>✅ real files in your workspace</td></tr>
+  <tr><td>Cloud VM sandbox, deploy tools</td><td>🚧 local processes now; Docker sandbox on the roadmap</td></tr>
+</table>
+
+<h2>Bring your own model</h2>
+<p>Defaults are local (<code>qwen2.5:3b</code> via ollama — chosen because small thinking models burn their budget before emitting tool calls on CPU). Any OpenAI-compatible endpoint works by pointing <code>MANUS_BASE_URL</code>, <code>MANUS_MODEL</code>, <code>MANUS_API_KEY</code> at it — zero code changes.</p>
+
+<h2>Safety</h2>
+<p>The shell tool runs real commands on your machine, confined to the workspace directory. It is a convenience, not a security boundary. A Docker-sandboxed shell is the top roadmap item.</p>
+
+<footer>
+  Built as a transparent, hackable reference implementation of the Manus agent pattern ·
+  <a href="https://github.com/nitishagar/diy-manus">github.com/nitishagar/diy-manus</a> · MIT
+</footer>
+
+</div>
+</body>
+</html>
