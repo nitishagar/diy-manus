@@ -38,7 +38,7 @@ class Config:
 
     base_url: str = "http://127.0.0.1:11434/v1"
     api_key: str = "ollama"
-    model: str = "qwen3:4b"
+    model: str = "qwen2.5:3b"
     max_steps: int = 30
     step_max_tokens: int = 512
     shell_timeout_s: int = 60
@@ -58,7 +58,7 @@ class Config:
         return cls(
             base_url=_env_str("MANUS_BASE_URL", "http://127.0.0.1:11434/v1"),
             api_key=_env_str("MANUS_API_KEY", "ollama"),
-            model=_env_str("MANUS_MODEL", "qwen3:4b"),
+            model=_env_str("MANUS_MODEL", "qwen2.5:3b"),
             max_steps=_env_int("MANUS_MAX_STEPS", 30),
             step_max_tokens=_env_int("MANUS_STEP_MAX_TOKENS", 512),
             shell_timeout_s=_env_int("MANUS_SHELL_TIMEOUT_S", 60),

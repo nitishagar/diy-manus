@@ -27,7 +27,7 @@ def resolve_confined(workspace: Path, raw: str) -> Path:
 
 class FileReadTool(Tool):
     name = "file_read"
-    description = "Read a text file inside the workspace. Returns the file content."
+    description = "Read a file in the workspace."
     parameters = {
         "type": "object",
         "properties": {
@@ -49,10 +49,7 @@ class FileReadTool(Tool):
 
 class FileWriteTool(Tool):
     name = "file_write"
-    description = (
-        "Write (or overwrite) a text file inside the workspace. Parent directories "
-        "are created automatically. Returns the written path."
-    )
+    description = "Write a file in the workspace (creates parent directories)."
     parameters = {
         "type": "object",
         "properties": {
@@ -75,7 +72,7 @@ class FileWriteTool(Tool):
 
 class FileListTool(Tool):
     name = "file_list"
-    description = "List files and directories under a workspace path."
+    description = "List a directory in the workspace."
     parameters = {
         "type": "object",
         "properties": {

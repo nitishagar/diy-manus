@@ -15,9 +15,7 @@ FETCH_MULTIPLE = 10
 
 class WebFetchTool(Tool):
     name = "web_fetch"
-    description = (
-        "Download a web page and return its readable main content as text. " "HTTP(S) URLs only."
-    )
+    description = "Fetch an http(s) page; returns readable main text."
     parameters = {
         "type": "object",
         "properties": {"url": {"type": "string", "description": "The http(s) URL to fetch."}},

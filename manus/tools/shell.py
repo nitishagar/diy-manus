@@ -16,11 +16,7 @@ READ_CHUNK = 4096
 
 class ShellExecTool(Tool):
     name = "shell_exec"
-    description = (
-        "Run a shell command (bash) inside the workspace and return combined "
-        "stdout+stderr and the exit code. Long-running commands are killed at the "
-        "configured timeout."
-    )
+    description = "Run bash in the workspace; returns output and exit code."
     parameters = {
         "type": "object",
         "properties": {

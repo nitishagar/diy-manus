@@ -12,10 +12,7 @@ from manus.util import truncate_bytes
 
 class WebSearchTool(Tool):
     name = "web_search"
-    description = (
-        "Search the web and return titles, URLs and snippets. Requires no API key "
-        "(local DuckDuckGo backend by default, or a self-hosted SearXNG)."
-    )
+    description = "Web search; returns titles, URLs and snippets."
     parameters = {
         "type": "object",
         "properties": {"query": {"type": "string", "description": "The search query."}},

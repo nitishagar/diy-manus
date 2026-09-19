@@ -35,9 +35,7 @@ def _launch(ctx: ToolContext):
 
 class BrowserNavigateTool(Tool):
     name = "browser_navigate"
-    description = (
-        "Open a URL in a local headless browser. Use before browser_click/browser_snapshot."
-    )
+    description = "Open a URL in a local headless browser."
     parameters = {
         "type": "object",
         "properties": {"url": {"type": "string", "description": "The http(s) URL to open."}},
@@ -59,10 +57,7 @@ class BrowserNavigateTool(Tool):
 
 class BrowserSnapshotTool(Tool):
     name = "browser_snapshot"
-    description = (
-        "Return the current page's visible text and numbered interactive elements "
-        "(for use with browser_click)."
-    )
+    description = "Return page text and numbered clickable elements."
     parameters = {"type": "object", "properties": {}, "required": []}
 
     def run(self, args: dict, ctx: ToolContext) -> str:
@@ -87,7 +82,7 @@ class BrowserSnapshotTool(Tool):
 
 class BrowserClickTool(Tool):
     name = "browser_click"
-    description = "Click an interactive element by its index from the last browser_snapshot."
+    description = "Click an element by index from browser_snapshot."
     parameters = {
         "type": "object",
         "properties": {

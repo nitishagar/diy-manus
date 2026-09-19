@@ -7,10 +7,7 @@ from manus.tools.base import Tool, ToolContext
 
 class FinishTool(Tool):
     name = "finish"
-    description = (
-        "End the task with a final summary for the user. Call this once the goal "
-        "is achieved (or cannot be progressed further), never mid-task."
-    )
+    description = "End the task with a final summary. Call only when the goal is met."
     parameters = {
         "type": "object",
         "properties": {
@@ -28,10 +25,7 @@ class FinishTool(Tool):
 
 class RecallTool(Tool):
     name = "recall"
-    description = (
-        "Search the memory of past task runs on this machine. Use to reuse earlier "
-        "results, commands, or findings relevant to the current task."
-    )
+    description = "Search past task sessions on this machine."
     parameters = {
         "type": "object",
         "properties": {"query": {"type": "string", "description": "Full-text search query."}},
