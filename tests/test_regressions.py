@@ -133,3 +133,46 @@ def test_empty_choices_is_typed_llm_error(monkeypatch):
     client = make_client(monkeypatch, lambda **kwargs: SimpleNamespace(choices=[]))
     with pytest.raises(LLMError, match="no choices"):
         client.chat([{"role": "user", "content": "hi"}], [])
+
+
+def test_file_read_refuses_fifo_and_returns_quickly(tmp_path):
+    """A FIFO in the workspace must not block the loop (security review: High)."""
+    import os
+    import time
+
+    from manus.config import Config
+    from manus.tools.base import ToolContext
+    from manus.tools.files import FileReadTool
+
+    fifo = tmp_path / "pipe"
+    os.mkfifo(fifo)
+    ctx = ToolContext(
+        workspace=tmp_path,
+        config=Config(workspace=tmp_path, db_path=tmp_path / "db.db", net_timeout_s=1),
+    )
+    start = time.monotonic()
+    result = FileReadTool().run({"path": "pipe"}, ctx)
+    assert time.monotonic() - start < 5, "file_read blocked on a FIFO"
+    assert result.startswith("Error:")
+    assert "not a regular file" in result
+
+
+def test_shell_kills_grandchildren_when_bash_exits_early(tmp_path):
+    """bash exiting before the deadline must not orphan backgrounded children."""
+    import subprocess
+
+    from manus.config import Config
+    from manus.tools.base import ToolContext
+    from manus.tools.shell import ShellExecTool
+
+    marker = "sleep 7.771"
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    ctx = ToolContext(
+        workspace=workspace,
+        config=Config(workspace=workspace, db_path=tmp_path / "db.db", shell_timeout_s=3),
+    )
+    result = ShellExecTool().run({"command": f"{marker} & echo hi; exit"}, ctx)
+    assert "hi" in result
+    pgrep = subprocess.run(["pgrep", "-f", marker], capture_output=True, text=True, timeout=10)
+    assert pgrep.returncode != 0, f"grandchild orphaned: {pgrep.stdout}"

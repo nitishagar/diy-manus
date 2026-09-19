@@ -39,7 +39,11 @@ class FileReadTool(Tool):
     def run(self, args: dict, ctx: ToolContext) -> str:
         try:
             path = resolve_confined(ctx.workspace, str(args.get("path", "")))
-            content = path.read_text(encoding="utf-8", errors="replace")
+            if not path.is_file():  # refuses dirs and FIFOs/sockets (opening those blocks)
+                return f"Error: {args.get('path')!r} is not a regular file"
+            with path.open("rb") as handle:
+                raw = handle.read(ctx.config.observe_cap_bytes + 1)
+            content = raw.decode("utf-8", errors="replace")
             if not content:
                 return "(empty file)"
             return truncate_bytes(content, ctx.config.observe_cap_bytes)
@@ -62,6 +66,8 @@ class FileWriteTool(Tool):
     def run(self, args: dict, ctx: ToolContext) -> str:
         try:
             path = resolve_confined(ctx.workspace, str(args.get("path", "")))
+            if path.exists() and not path.is_file():
+                return f"Error: {args.get('path')!r} is not a regular file"
             content = str(args.get("content", ""))
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")

@@ -65,8 +65,9 @@ class ShellExecTool(Tool):
                 elif proc.poll() is not None:
                     break  # exited, and the pipe was empty at the last select
         finally:
-            if proc.poll() is None:
-                self._kill_group(proc)
+            # unconditional: bash may exit before the deadline while a backgrounded
+            # grandchild keeps running; killpg on a dead group is a harmless no-op
+            self._kill_group(proc)
             if proc.stdout is not None:
                 proc.stdout.close()
 

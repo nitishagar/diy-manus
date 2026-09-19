@@ -181,7 +181,7 @@ def test_web_search_searxng_backend_switch(ctx, monkeypatch):
         def __exit__(self, *exc):
             return False
 
-        def read(self):
+        def read(self, size=-1):
             return b'{"results": [{"title": "S", "url": "http://x", "content": "c"}]}'
 
     def fake_urlopen(request, timeout=None):

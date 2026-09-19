@@ -65,3 +65,11 @@ Additional nits not individually itemized (count: 6): `_end()` is a trivial pass
 The reviewed diff as committed earns MINOR-FAIL: seven localized defects, none architectural; all but I6 (owned by the concurrent in-flight fix) repaired in place and regression-tested.
 
 VERDICT: MINOR-FAIL
+
+## Re-verification (2026-09-19, commit 8af5898)
+
+Fixes committed as `8af5898` on top of the reviewed tree; working tree clean, so the committed state is what was re-verified. Each fix hunk inspected in the commit (not just the working tree): I1 `rows` init, I2 `max(0, cut)`, I3 single per-step `cid` used in both messages, I4 `_apply_overrides`+`ConfigError` handling on all CLI paths, I5 `browser.close()`/`playwright.stop()` on partial launch, I7 typed retry-failure + empty-choices `LLMError`, N1/N2/N4. I6 resolved in-commit by the test reviewer (`tests/test_tools.py` now serves the fetch test from a localhost `HTTPServer`; remaining `example.com` strings are mocked ddgs data, not network). Gates re-run on the committed tree: flake8 clean, mypy clean (16 files), black clean (24 files unchanged), 72 passed. N3 (`/tmp/wsx` shared paths in `test_max_steps_terminates_run`) and N5 (`file_list` in-memory listing) remain as accepted, documented nits — not MINOR-FAIL drivers.
+
+Per-finding: I1 RESOLVED · I2 RESOLVED · I3 RESOLVED · I4 RESOLVED · I5 RESOLVED · I6 RESOLVED (test reviewer, in-commit) · I7 RESOLVED · N1 RESOLVED · N2 RESOLVED · N3 accepted-nit · N4 RESOLVED · N5 accepted-nit.
+
+VERDICT: PASS

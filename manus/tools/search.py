@@ -59,7 +59,8 @@ class WebSearchTool(Tool):
         url = f"{base}/search?" + urllib.parse.urlencode({"q": query, "format": "json"})
         request = urllib.request.Request(url, headers={"User-Agent": "diy-manus/0.1"})
         with urllib.request.urlopen(request, timeout=ctx.config.net_timeout_s) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            raw = response.read(ctx.config.observe_cap_bytes * 2 + 1)
+            payload = json.loads(raw.decode("utf-8"))
         return [
             {
                 "title": str(r.get("title", ""))[:200],
