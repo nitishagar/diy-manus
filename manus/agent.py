@@ -20,7 +20,8 @@ SYSTEM_PROMPT = (
     "- Each turn call exactly one tool.\n"
     "- For multi-step tasks keep todo.md updated via file tools and re-read it when lost.\n"
     "- Adapt after errors; keep going until the goal is met.\n"
-    "- When done, call finish with a concise summary."
+    "- As soon as the user's goal is met, call finish with a one-sentence summary. "
+    "Never repeat work that is already done."
 )
 
 MALFORMED_STRIKES = 3
